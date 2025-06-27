@@ -1,61 +1,71 @@
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-import datetime
+import psycopg2
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-# Configuration PostgreSQL (Render External URL)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://orders_db_ef5t_user:j93zTiEEy3RfrIOuodAhIuzpSowuIuYG@dpg-d1f8iq3e5dus73fmrdf0-a.singapore-postgres.render.com/orders_db_ef5t'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Connexion à la base PostgreSQL avec la variable d'environnement
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-db = SQLAlchemy(app)
+def connect_db():
+    return psycopg2.connect(DATABASE_URL)
 
-# Définition du modèle de commande
-class Order(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    order_number = db.Column(db.String(50))
-    nom = db.Column(db.String(100))
-    prenom = db.Column(db.String(100))
-    email = db.Column(db.String(150))
-    logiciel = db.Column(db.String(100))
-    paiement = db.Column(db.String(100))
-
-# Route d'envoi des commandes
 @app.route('/submit', methods=['POST'])
 def submit_order():
     try:
         data = request.get_json()
 
-        last_id = db.session.query(db.func.max(Order.id)).scalar() or 0
-        numero = f"CMD-{last_id + 1:04d}"
+        nom = data.get('nom')
+        prenom = data.get('prenom')
+        email = data.get('email')
+        logiciel = data.get('logiciel')
+        paiement = data.get('paiement')
 
-        new_order = Order(
-            order_number=numero,
-            nom=data.get('nom'),
-            prenom=data.get('prenom'),
-            email=data.get('email'),
-            logiciel=data.get('logiciel'),
-            paiement=data.get('paiement')
-        )
+        if not all([nom, prenom, email, logiciel, paiement]):
+            return jsonify({'success': False, 'error': 'Champs manquants'}), 400
 
-        db.session.add(new_order)
-        db.session.commit()
+        conn = connect_db()
+        cur = conn.cursor()
 
-        return jsonify({'success': True, 'numero': numero})
+        # Crée la table si elle n'existe pas encore
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS commandes (
+                id SERIAL PRIMARY KEY,
+                date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                numero TEXT,
+                nom TEXT,
+                prenom TEXT,
+                email TEXT,
+                logiciel TEXT,
+                paiement TEXT
+            );
+        """)
+
+        # Génère un numéro de commande unique
+        cur.execute("SELECT COUNT(*) FROM commandes;")
+        count = cur.fetchone()[0] + 1
+        numero_commande = f"CMD-{count:04d}"
+
+        # Insère les données
+        cur.execute("""
+            INSERT INTO commandes (numero, nom, prenom, email, logiciel, paiement)
+            VALUES (%s, %s, %s, %s, %s, %s);
+        """, (numero_commande, nom, prenom, email, logiciel, paiement))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({'success': True, 'numero': numero_commande})
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# Point de test GET
-@app.route('/')
-def index():
-    return "API Flask opérationnelle avec PostgreSQL sur Render"
+@app.route('/', methods=['GET'])
+def home():
+    return "Backend opérationnel."
 
-# Lancement local (à ne pas activer sur Render)
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
