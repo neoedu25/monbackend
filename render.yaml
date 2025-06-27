@@ -2,8 +2,10 @@ services:
   - type: web
     name: mon-backend
     env: python
-    buildCommand: ""
-    startCommand: python app.py
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
     envVars:
       - key: FLASK_ENV
         value: production
+      - key: DATABASE_URL
+        value: postgresql://orders_db_ef5t_user:j93zTiEEy3RfrIOuodAhIuzpSowuIuYG@dpg-d1f8iq3e5dus73fmrdf0-a.singapore-postgres.render.com/orders_db_ef5t
