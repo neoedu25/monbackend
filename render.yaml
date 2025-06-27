@@ -1,11 +1,9 @@
 services:
   - type: web
-    name: monbackend
+    name: mon-backend
     env: python
     buildCommand: ""
     startCommand: gunicorn app:app
     envVars:
       - key: FLASK_ENV
         value: production
-    build:
-      pythonVersion: 3.10
