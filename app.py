@@ -38,13 +38,14 @@ def ping():
 def handle_order():
     try:
         data = request.get_json()
-        first_name = data.get("first_name")
-        last_name = data.get("last_name")
+        # Read the French form names
+        first_name = data.get("prenom")
+        last_name = data.get("nom")
         email = data.get("email")
         phone = data.get("phone")
-        software = data.get("software")
-        payment_method = data.get("payment_method")
-        contact_method = data.get("contact_method")
+        software = data.get("logiciel")
+        payment_method = data.get("paiment")
+        contact_method = data.get("contact_Method")  # Note: your form has 'contact_Method'
         message = data.get("message")
         date_now = datetime.utcnow()
 
@@ -79,10 +80,10 @@ def handle_order():
                 date_part = date_now.strftime("%Y%m%d")
                 commande_number = f"{code}-{date_part}-{inserted_id}"
 
-                # Update the row with the commande_number
-                cur.execute("""
-                    UPDATE commandes SET commande_number=%s WHERE id=%s
-                """, (commande_number, inserted_id))
+                cur.execute(
+                    "UPDATE commandes SET commande_number=%s WHERE id=%s",
+                    (commande_number, inserted_id)
+                )
                 conn.commit()
 
         return jsonify({
