@@ -38,13 +38,13 @@ def ping():
 def handle_order():
     try:
         data = request.get_json()
-        first_name = data.get("firstName")
-        last_name = data.get("lastName")
+        prenom = data.get("prenom")
+        nom = data.get("nom")
         email = data.get("email")
         phone = data.get("phone")
-        software = data.get("software")
-        payment_method = data.get("paymentMethod")
-        contact_method = data.get("contactMethod")
+        logiciel = data.get("logiciel")
+        paiment = data.get("paiment")
+        contact_Method = data.get("contact_Method")
         message = data.get("message")
         date_now = datetime.utcnow()
 
@@ -55,28 +55,28 @@ def handle_order():
                     CREATE TABLE IF NOT EXISTS commandes (
                         id SERIAL PRIMARY KEY,
                         commande_number TEXT,
-                        first_name TEXT,
-                        last_name TEXT,
+                        prenom TEXT,
+                        nom TEXT,
                         email TEXT,
                         phone TEXT,
-                        software TEXT,
-                        payment_method TEXT,
-                        contact_method TEXT,
+                        logiciel TEXT,
+                        paiment TEXT,
+                        contact_Method TEXT,
                         message TEXT,
                         date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
                 cur.execute("""
                     INSERT INTO commandes
-                        (commande_number, first_name, last_name, email, phone, software, payment_method, contact_method, message, date)
+                        (commande_number, prenom, nom, email, phone, logiciel, paiment, contact_Method, message, date)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
-                    None, first_name, last_name, email, phone, software,
-                    payment_method, contact_method, message, date_now
+                    None, prenom, nom, email, phone, logiciel,
+                    paiment, contact_Method, message, date_now
                 ))
                 inserted_id = cur.fetchone()[0]
-                code = SOFTWARE_CODES.get(software, "XX")
+                code = SOFTWARE_CODES.get(logiciel, "XX")
                 date_part = date_now.strftime("%Y%m%d")
                 commande_number = f"{code}-{date_part}-{inserted_id}"
 
@@ -100,8 +100,8 @@ def handle_order():
 def handle_contact():
     try:
         data = request.get_json()
-        first_name = data.get("firstName")
-        last_name = data.get("lastName")
+        prenom = data.get("prenom")
+        nom = data.get("nom")
         email = data.get("email")
         subject = data.get("subject")
 
@@ -110,17 +110,17 @@ def handle_contact():
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS contacts (
                         id SERIAL PRIMARY KEY,
-                        first_name TEXT,
-                        last_name TEXT,
+                        prenom TEXT,
+                        nom TEXT,
                         email TEXT,
                         subject TEXT,
                         date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
                 cur.execute("""
-                    INSERT INTO contacts (first_name, last_name, email, subject)
+                    INSERT INTO contacts (prenom, nom, email, subject)
                     VALUES (%s, %s, %s, %s)
-                """, (first_name, last_name, email, subject))
+                """, (prenom, nom, email, subject))
                 conn.commit()
 
         return jsonify({"success": True, "message": "Message de contact enregistré avec succès"}), 201
