@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import psycopg
+from datetime import datetime
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})  # Autorise toutes les origines
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Connexion PostgreSQL (⚠️ À sécuriser en prod avec des variables d'environnement)
+# PostgreSQL connection info
 conn_info = (
     "dbname=orders_db_ef5t "
     "user=orders_db_ef5t_user "
@@ -13,6 +14,21 @@ conn_info = (
     "host=dpg-d1f8iq3e5dus73fmrdf0-a.singapore-postgres.render.com "
     "port=5432 sslmode=require"
 )
+
+SOFTWARE_CODES = {
+    "Architecture Pack": "AP",
+    "Construction and BIM": "CB",
+    "Animation and VFX": "AF",
+    "AutoCAD": "AC",
+    "Revit": "RV",
+    "3ds Max": "3M",
+    "Maya": "MA",
+    "Navisworks": "NW",
+    "Inventor": "IV",
+    "MotionBuilder": "MB",
+    "Fusion 360": "F3",
+    "Flame": "FL"
+}
 
 @app.route("/ping", methods=["GET"])
 def ping():
@@ -22,33 +38,60 @@ def ping():
 def handle_order():
     try:
         data = request.get_json()
-
-        nom = data.get("nom")
-        prenom = data.get("prenom")
+        first_name = data.get("firstName")
+        last_name = data.get("lastName")
         email = data.get("email")
-        logiciel = data.get("logiciel")
-        paiement = data.get("paiement")
+        phone = data.get("phone")
+        software = data.get("software")
+        payment_method = data.get("paymentMethod")
+        contact_method = data.get("contactMethod")
+        message = data.get("message")
+        date_now = datetime.utcnow()
 
+        # Insert the order without the commande_number to get the auto-incremented id
         with psycopg.connect(conn_info) as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS commandes (
                         id SERIAL PRIMARY KEY,
-                        nom TEXT,
-                        prenom TEXT,
+                        commande_number TEXT,
+                        first_name TEXT,
+                        last_name TEXT,
                         email TEXT,
-                        logiciel TEXT,
-                        paiement TEXT,
+                        phone TEXT,
+                        software TEXT,
+                        payment_method TEXT,
+                        contact_method TEXT,
+                        message TEXT,
                         date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
                 cur.execute("""
-                    INSERT INTO commandes (nom, prenom, email, logiciel, paiement)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (nom, prenom, email, logiciel, paiement))
+                    INSERT INTO commandes
+                        (commande_number, first_name, last_name, email, phone, software, payment_method, contact_method, message, date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    None, first_name, last_name, email, phone, software,
+                    payment_method, contact_method, message, date_now
+                ))
+                inserted_id = cur.fetchone()[0]
+                code = SOFTWARE_CODES.get(software, "XX")
+                date_part = date_now.strftime("%Y%m%d")
+                commande_number = f"{code}-{date_part}-{inserted_id}"
+
+                # Update the row with the commande_number
+                cur.execute("""
+                    UPDATE commandes SET commande_number=%s WHERE id=%s
+                """, (commande_number, inserted_id))
                 conn.commit()
 
-        return jsonify({"success": True, "message": "Commande enregistrée avec succès"}), 201
+        return jsonify({
+            "success": True,
+            "message": "Commande enregistrée avec succès",
+            "commande_number": commande_number,
+            "date": date_now.strftime("%Y-%m-%d %H:%M:%S UTC")
+        }), 201
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -57,7 +100,6 @@ def handle_order():
 def handle_contact():
     try:
         data = request.get_json()
-
         first_name = data.get("firstName")
         last_name = data.get("lastName")
         email = data.get("email")
