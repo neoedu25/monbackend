@@ -38,45 +38,44 @@ def ping():
 def handle_order():
     try:
         data = request.get_json()
-        prenom = data.get("prenom")
-        nom = data.get("nom")
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
         email = data.get("email")
         phone = data.get("phone")
-        logiciel = data.get("logiciel")
-        paiment = data.get("paiment")
-        contact_Method = data.get("contact_Method")
+        software = data.get("software")
+        payment_method = data.get("payment_method")
+        contact_method = data.get("contact_method")
         message = data.get("message")
         date_now = datetime.utcnow()
 
-        # Insert the order without the commande_number to get the auto-incremented id
         with psycopg.connect(conn_info) as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS commandes (
                         id SERIAL PRIMARY KEY,
                         commande_number TEXT,
-                        prenom TEXT,
-                        nom TEXT,
+                        first_name TEXT,
+                        last_name TEXT,
                         email TEXT,
                         phone TEXT,
-                        logiciel TEXT,
-                        paiment TEXT,
-                        contact_Method TEXT,
+                        software TEXT,
+                        payment_method TEXT,
+                        contact_method TEXT,
                         message TEXT,
                         date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
                 cur.execute("""
                     INSERT INTO commandes
-                        (commande_number, prenom, nom, email, phone, logiciel, paiment, contact_Method, message, date)
+                        (commande_number, first_name, last_name, email, phone, software, payment_method, contact_method, message, date)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
-                    None, prenom, nom, email, phone, logiciel,
-                    paiment, contact_Method, message, date_now
+                    None, first_name, last_name, email, phone, software,
+                    payment_method, contact_method, message, date_now
                 ))
                 inserted_id = cur.fetchone()[0]
-                code = SOFTWARE_CODES.get(logiciel, "XX")
+                code = SOFTWARE_CODES.get(software, "XX")
                 date_part = date_now.strftime("%Y%m%d")
                 commande_number = f"{code}-{date_part}-{inserted_id}"
 
@@ -88,7 +87,7 @@ def handle_order():
 
         return jsonify({
             "success": True,
-            "message": "Commande enregistrée avec succès",
+            "message": "Order recorded successfully",
             "commande_number": commande_number,
             "date": date_now.strftime("%Y-%m-%d %H:%M:%S UTC")
         }), 201
