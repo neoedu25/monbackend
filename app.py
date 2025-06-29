@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect, url_for
 from flask_cors import CORS
 import psycopg
 from datetime import datetime
@@ -86,12 +86,17 @@ def handle_order():
                 )
                 conn.commit()
 
-        return jsonify({
+        # Instead of returning JSON, send a 303 redirect for fetch/XHR
+        response = jsonify({
             "success": True,
             "message": "Order recorded successfully",
             "commande_number": commande_number,
-            "date": date_now.strftime("%Y-%m-%d %H:%M:%S UTC")
-        }), 201
+            "date": date_now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "redirect": "/thankyou.html"
+        })
+        response.status_code = 201
+        response.headers['Location'] = '/thankyou.html'
+        return response
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
