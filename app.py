@@ -101,7 +101,6 @@ def handle_order():
                 )
                 conn.commit()
 
-        # Instead of returning JSON, send a 303 redirect for fetch/XHR
         response = jsonify({
             "success": True,
             "message": "Order recorded successfully",
@@ -120,6 +119,12 @@ def handle_order():
 def handle_contact():
     try:
         data = request.get_json()
+
+        # ---- CAPTCHA Validation ----
+        if not validate_captcha(data):
+            return jsonify({"success": False, "error": "Invalid captcha answer."}), 400
+        # ---- End CAPTCHA Validation ----
+
         prenom = data.get("prenom")
         nom = data.get("nom")
         email = data.get("email")
@@ -144,6 +149,51 @@ def handle_contact():
                 conn.commit()
 
         return jsonify({"success": True, "message": "Message de contact enregistré avec succès"}), 201
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/school_quote", methods=["POST"])
+def handle_school_quote():
+    try:
+        data = request.get_json()
+
+        # ---- CAPTCHA Validation ----
+        if not validate_captcha(data):
+            return jsonify({"success": False, "error": "Invalid captcha answer."}), 400
+        # ---- End CAPTCHA Validation ----
+
+        first_name = data.get("prenom")
+        last_name = data.get("nom")
+        email = data.get("email")
+        school = data.get("school")
+        tools = data.get("tools")
+        seat_count = data.get("seat_count")
+        subject = data.get("subject")
+        date_now = datetime.utcnow()
+
+        with psycopg.connect(conn_info) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS school_quotes (
+                        id SERIAL PRIMARY KEY,
+                        first_name TEXT,
+                        last_name TEXT,
+                        email TEXT,
+                        school TEXT,
+                        tools TEXT,
+                        seat_count INTEGER,
+                        subject TEXT,
+                        date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                cur.execute("""
+                    INSERT INTO school_quotes (first_name, last_name, email, school, tools, seat_count, subject, date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (first_name, last_name, email, school, tools, seat_count, subject, date_now))
+                conn.commit()
+
+        return jsonify({"success": True, "message": "School quote request recorded successfully"}), 201
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
