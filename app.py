@@ -125,26 +125,27 @@ def handle_contact():
             return jsonify({"success": False, "error": "Invalid captcha answer."}), 400
         # ---- End CAPTCHA Validation ----
 
-       first_name = data.get("first_name")
-       last_name = data.get("last_name")
-       email = data.get("email")
-       subject = data.get("subject")
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        email = data.get("email")
+        subject = data.get("subject")
+
         with psycopg.connect(conn_info) as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS contacts (
                         id SERIAL PRIMARY KEY,
-                        prenom TEXT,
-                        nom TEXT,
+                        first_name TEXT,
+                        last_name TEXT,
                         email TEXT,
                         subject TEXT,
                         date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
                 cur.execute("""
-                    INSERT INTO contacts (prenom, nom, email, subject)
+                    INSERT INTO contacts (first_name, last_name, email, subject)
                     VALUES (%s, %s, %s, %s)
-                """, (prenom, nom, email, subject))
+                """, (first_name, last_name, email, subject))
                 conn.commit()
 
         return jsonify({"success": True, "message": "Message de contact enregistré avec succès"}), 201
