@@ -2,8 +2,6 @@ from flask import Flask, request, jsonify, redirect, url_for
 from flask_cors import CORS
 import psycopg
 from datetime import datetime
-
-# NEW: bcrypt for password checking
 import bcrypt
 
 app = Flask(__name__)
@@ -65,6 +63,8 @@ def handle_order():
         payment_method = data.get("paiment")
         contact_method = data.get("contact_Method")  # Note: your form has 'contact_Method'
         message = data.get("message")
+        referral_code = data.get("referral_code")  # Accept referral code from order form
+        price = data.get("price")
         date_now = datetime.utcnow()
 
         with psycopg.connect(conn_info) as conn:
@@ -81,17 +81,19 @@ def handle_order():
                         payment_method TEXT,
                         contact_method TEXT,
                         message TEXT,
+                        referral_code TEXT,
+                        price NUMERIC,
                         date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
                 cur.execute("""
                     INSERT INTO commandes
-                        (commande_number, first_name, last_name, email, phone, software, payment_method, contact_method, message, date)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        (commande_number, first_name, last_name, email, phone, software, payment_method, contact_method, message, referral_code, price, date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
                     None, first_name, last_name, email, phone, software,
-                    payment_method, contact_method, message, date_now
+                    payment_method, contact_method, message, referral_code, price, date_now
                 ))
                 inserted_id = cur.fetchone()[0]
                 code = SOFTWARE_CODES.get(software, "XX")
@@ -201,7 +203,6 @@ def handle_school_quote():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# --- INFLUENCER LOGIN ENDPOINT ---
 @app.route("/login_influencer", methods=["POST"])
 def login_influencer():
     try:
@@ -214,7 +215,6 @@ def login_influencer():
 
         with psycopg.connect(conn_info) as conn:
             with conn.cursor() as cur:
-                # Ensure table exists (remove if sure it's created already)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS influencers (
                         id SERIAL PRIMARY KEY,
@@ -238,6 +238,41 @@ def login_influencer():
                     }), 200
                 else:
                     return jsonify({"success": False, "error": "Invalid username or password"}), 401
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/orders_by_referral", methods=["POST"])
+def orders_by_referral():
+    try:
+        data = request.get_json()
+        referral_code = data.get("referral_code")
+        if not referral_code:
+            return jsonify({"success": False, "error": "Referral code required"}), 400
+
+        with psycopg.connect(conn_info) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, first_name, last_name, email, phone, software, payment_method, date, price
+                    FROM commandes
+                    WHERE referral_code = %s
+                    ORDER BY date DESC
+                """, (referral_code,))
+                orders = [
+                    {
+                        "id": row[0],
+                        "first_name": row[1],
+                        "last_name": row[2],
+                        "email": row[3],
+                        "phone": row[4],
+                        "software": row[5],
+                        "payment_method": row[6],
+                        "date": row[7].strftime("%Y-%m-%d %H:%M:%S") if row[7] else "",
+                        "price": float(row[8]) if row[8] is not None else None
+                    }
+                    for row in cur.fetchall()
+                ]
+        return jsonify({"success": True, "orders": orders}), 200
+
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
