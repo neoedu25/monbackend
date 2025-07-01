@@ -31,6 +31,24 @@ SOFTWARE_CODES = {
     "Flame": "FL"
 }
 
+# Step 1: Add validate_referral endpoint
+@app.route("/validate_referral", methods=["POST"])
+def validate_referral():
+    try:
+        data = request.get_json()
+        code = data.get("referral_code")
+        if not code:
+            return jsonify({"valid": False, "error": "No code provided"}), 400
+
+        with psycopg.connect(conn_info) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM influencers WHERE referral_code = %s", (code,))
+                exists = cur.fetchone() is not None
+
+        return jsonify({"valid": exists})
+    except Exception as e:
+        return jsonify({"valid": False, "error": str(e)}), 500
+
 def validate_captcha(data):
     try:
         num1 = int(data.get('captcha_num1'))
@@ -54,16 +72,15 @@ def handle_order():
             return jsonify({"success": False, "error": "Invalid captcha answer."}), 400
         # ---- End CAPTCHA Validation ----
 
-        # Read the French form names
         first_name = data.get("prenom")
         last_name = data.get("nom")
         email = data.get("email")
         phone = data.get("phone")
         software = data.get("logiciel")
         payment_method = data.get("paiment")
-        contact_method = data.get("contact_Method")  # Note: your form has 'contact_Method'
+        contact_method = data.get("contact_Method")
         message = data.get("message")
-        referral_code = data.get("referral_code")  # Accept referral code from order form
+        referral_code = data.get("referral_code")
         price = data.get("price")
         date_now = datetime.utcnow()
 
@@ -125,10 +142,8 @@ def handle_contact():
     try:
         data = request.get_json()
 
-        # ---- CAPTCHA Validation ----
         if not validate_captcha(data):
             return jsonify({"success": False, "error": "Invalid captcha answer."}), 400
-        # ---- End CAPTCHA Validation ----
 
         first_name = data.get("first_name")
         last_name = data.get("last_name")
@@ -163,10 +178,8 @@ def handle_school_quote():
     try:
         data = request.get_json()
 
-        # ---- CAPTCHA Validation ----
         if not validate_captcha(data):
             return jsonify({"success": False, "error": "Invalid captcha answer."}), 400
-        # ---- End CAPTCHA Validation ----
 
         first_name = data.get("prenom")
         last_name = data.get("nom")
