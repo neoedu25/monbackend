@@ -3,6 +3,9 @@ from flask_cors import CORS
 import psycopg
 from datetime import datetime
 
+# NEW: bcrypt for password checking
+import bcrypt
+
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
@@ -195,6 +198,46 @@ def handle_school_quote():
 
         return jsonify({"success": True, "message": "School quote request recorded successfully"}), 201
 
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# --- INFLUENCER LOGIN ENDPOINT ---
+@app.route("/login_influencer", methods=["POST"])
+def login_influencer():
+    try:
+        data = request.get_json()
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return jsonify({"success": False, "error": "Username and password required"}), 400
+
+        with psycopg.connect(conn_info) as conn:
+            with conn.cursor() as cur:
+                # Ensure table exists (remove if sure it's created already)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS influencers (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT UNIQUE NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        referral_code TEXT,
+                        email TEXT
+                    )
+                """)
+                cur.execute("SELECT password_hash, referral_code, email FROM influencers WHERE username=%s", (username,))
+                row = cur.fetchone()
+                if not row:
+                    return jsonify({"success": False, "error": "Invalid username or password"}), 401
+                password_hash, referral_code, email = row
+                if bcrypt.checkpw(password.encode(), password_hash.encode()):
+                    return jsonify({
+                        "success": True,
+                        "message": "Login successful",
+                        "referral_code": referral_code,
+                        "email": email
+                    }), 200
+                else:
+                    return jsonify({"success": False, "error": "Invalid username or password"}), 401
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
