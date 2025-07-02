@@ -73,6 +73,11 @@ def admin_logout():
     session.pop("is_admin", None)
     return jsonify({"success": True})
 
+# --- Whoami endpoint for session debugging ---
+@app.route("/whoami", methods=["GET"])
+def whoami():
+    return jsonify({"is_admin": session.get("is_admin", False)})
+
 # --- Admin Tables Endpoints ---
 @app.route("/all_commandes", methods=["GET"])
 @admin_required
