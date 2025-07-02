@@ -6,7 +6,16 @@ import bcrypt
 from functools import wraps
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+# --- CORRECT CORS CONFIG FOR YOUR FRONTEND DOMAIN ---
+CORS(app, resources={r"/*": {"origins": "https://www.neoedu.xyz"}}, supports_credentials=True)
+
+# --- ENSURE SESSION COOKIE CAN BE SENT CROSS-SITE (REQUIRED FOR FRONTEND-BACKEND ON DIFFERENT DOMAINS) ---
+app.config.update(
+    SESSION_COOKIE_SAMESITE="None",
+    SESSION_COOKIE_SECURE=True
+)
+
 app.secret_key = 'your_super_secret_admin_key'  # CHANGE THIS for production!
 
 # --- Admin credentials ---
