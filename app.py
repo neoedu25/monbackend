@@ -1,13 +1,19 @@
-from flask import Flask, request, jsonify, redirect, url_for
+from flask import Flask, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
 import psycopg
 from datetime import datetime
 import bcrypt
+from functools import wraps
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+app.secret_key = 'your_super_secret_admin_key'  # CHANGE THIS for production!
 
-# PostgreSQL connection info
+# --- Admin credentials ---
+ADMIN_USER = 'raoufadmin'
+ADMIN_PASS_HASH = b'$2b$12$TUdIAG2NUfst3gGYhf9q5O.Lgw28tVYoxEp64xQJZ6Z.HPGdUN/gO'  # bcrypt hash
+
+# --- PostgreSQL connection info ---
 conn_info = (
     "dbname=orders_db_ef5t "
     "user=orders_db_ef5t_user "
@@ -31,7 +37,125 @@ SOFTWARE_CODES = {
     "Flame": "FL"
 }
 
-# Step 1: Add validate_referral endpoint
+# --- Admin Auth Decorator ---
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("is_admin"):
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+# --- Admin Login Endpoint ---
+@app.route("/admin_login", methods=["POST"])
+def admin_login():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+    if username == ADMIN_USER and bcrypt.checkpw(password.encode(), ADMIN_PASS_HASH):
+        session["is_admin"] = True
+        return jsonify({"success": True})
+    else:
+        return jsonify({"success": False, "error": "Invalid credentials"}), 401
+
+# --- Admin Logout Endpoint ---
+@app.route("/admin_logout", methods=["POST"])
+def admin_logout():
+    session.pop("is_admin", None)
+    return jsonify({"success": True})
+
+# --- Admin Tables Endpoints ---
+@app.route("/all_commandes", methods=["GET"])
+@admin_required
+def all_commandes():
+    try:
+        with psycopg.connect(conn_info) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, commande_number, first_name, last_name, email, phone, software,
+                           payment_method, contact_method, message, referral_code, price, date
+                    FROM commandes
+                    ORDER BY date DESC
+                """)
+                commandes = [
+                    {
+                        "id": row[0],
+                        "commande_number": row[1],
+                        "first_name": row[2],
+                        "last_name": row[3],
+                        "email": row[4],
+                        "phone": row[5],
+                        "software": row[6],
+                        "payment_method": row[7],
+                        "contact_method": row[8],
+                        "message": row[9],
+                        "referral_code": row[10],
+                        "price": float(row[11]) if row[11] is not None else None,
+                        "date": row[12].strftime("%Y-%m-%d %H:%M:%S") if row[12] else ""
+                    }
+                    for row in cur.fetchall()
+                ]
+        return jsonify({"commandes": commandes}), 200
+    except Exception as e:
+        return jsonify({"commandes": [], "error": str(e)}), 500
+
+@app.route("/all_contacts", methods=["GET"])
+@admin_required
+def all_contacts():
+    try:
+        with psycopg.connect(conn_info) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, first_name, last_name, email, subject, date
+                    FROM contacts
+                    ORDER BY date DESC
+                """)
+                contacts = [
+                    {
+                        "id": row[0],
+                        "first_name": row[1],
+                        "last_name": row[2],
+                        "email": row[3],
+                        "subject": row[4],
+                        "date": row[5].strftime("%Y-%m-%d %H:%M:%S") if row[5] else ""
+                    }
+                    for row in cur.fetchall()
+                ]
+        return jsonify({"contacts": contacts}), 200
+    except Exception as e:
+        return jsonify({"contacts": [], "error": str(e)}), 500
+
+@app.route("/all_school_quotes", methods=["GET"])
+@admin_required
+def all_schools():
+    try:
+        with psycopg.connect(conn_info) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, first_name, last_name, email, school, tools, seat_count, subject, date
+                    FROM school_quotes
+                    ORDER BY date DESC
+                """)
+                schools = [
+                    {
+                        "id": row[0],
+                        "first_name": row[1],
+                        "last_name": row[2],
+                        "email": row[3],
+                        "school": row[4],
+                        "tools": row[5],
+                        "seat_count": row[6],
+                        "subject": row[7],
+                        "date": row[8].strftime("%Y-%m-%d %H:%M:%S") if row[8] else ""
+                    }
+                    for row in cur.fetchall()
+                ]
+        return jsonify({"schools": schools}), 200
+    except Exception as e:
+        return jsonify({"schools": [], "error": str(e)}), 500
+
+# --- Existing endpoints below (unchanged) ---
+
 @app.route("/validate_referral", methods=["POST"])
 def validate_referral():
     try:
